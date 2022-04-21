@@ -1,7 +1,7 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
-from maps import MapFD
+from maps import MapFD, MapBF
 from world import World
 from player import Player
 import sys
@@ -23,7 +23,7 @@ displaysurface = pygame.display.set_mode(SIZE)
 pygame.display.set_caption("Game")
 
 world = World(SIZE)
-world.extend(MapFD(world))
+world.extend(MapBF(world))
 world.append(Player(world))
 
 all_sprites = pygame.sprite.Group()
@@ -43,8 +43,8 @@ while True:
 
     displaysurface.fill(BG_color)
 
-    for entity in all_sprites:
-        displaysurface.blit(entity.surf, entity.rect)
+    for entity in world:
+        entity.draw(displaysurface)
 
     pygame.display.update()
     FramePerSec.tick(FPS)
