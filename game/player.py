@@ -2,7 +2,7 @@ import pygame
 from pygame.locals import *
 from pygame.math import Vector2
 
-from inputs import Inputs
+from inputs import Inputs, Movements
 
 
 class Player(pygame.sprite.Sprite):
@@ -22,18 +22,25 @@ class Player(pygame.sprite.Sprite):
         self.surf.fill(Player.COLOR)
         self.rect = self.surf.get_rect()
 
+        # state
+        self.grounded = False
+
+        # physics
         self.fric = -0.12
         self.mass = 100
 
         # jumps
-        self.max_air_jumps = 1
-        self.jumps = self.max_air_jumps
-        self.air_jump_strength = -9
-        self.short_hop_strength = -8
-        self.full_hop_strength = -13
-        self.hop_selection_t = 0
+        self.jumps_air_max = 1
+        self.jumps = self.jumps_air_max
+        self.jumps_air_strength = -9
+        self.jumps_short_strength = -8
+        self.jumps_full_strength = -13
+        self.jumps_selection_t = 0
 
-        self.grounded = False
+        # fast fall
+        self.gravity_multiplier = 1
+        self.fast_fall_gravity_multiplier = 1.7
+        self.fast_fall_y_vel_threshold = 2.5
 
         # computed forces
         self.gravity_F = Vector2(0, Player.G * self.mass)
@@ -54,6 +61,7 @@ class Player(pygame.sprite.Sprite):
         self.handle_platforms()
         self.handle_movements()
         self.handle_jumps()
+        self.handle_fast_fall()
         self.handle_physics()
 
     def apply_force(self, f):
@@ -70,9 +78,9 @@ class Player(pygame.sprite.Sprite):
 
     def handle_movements(self):
         inputs = self.world.inputs
-        if inputs.press(K_LEFT):
+        if inputs.press(Movements.LEFT):
             self.apply_force(-self.walk_F)
-        if inputs.press(K_RIGHT):
+        if inputs.press(Movements.RIGHT):
             self.apply_force(self.walk_F)
 
     def handle_platforms(self):
@@ -81,30 +89,40 @@ class Player(pygame.sprite.Sprite):
             self, self.world.platforms(), False)
         self.grounded = False
         for platform in interact_platforms:
-            self.grounded |= platform.interact(self, inputs.press(K_DOWN))
+            self.grounded |= platform.interact(
+                self, inputs.press(Movements.FALL))
 
     def handle_jumps(self):
         inputs = self.world.inputs
-        if inputs.pressed(K_UP) and self.jumps > 0:
+        if inputs.pressed(Movements.JUMP) and self.jumps > 0:
             # grounded jumps
             if self.grounded:
-                self.vel.y = self.full_hop_strength
-                self.hop_selection_t = self.HOP_SELECTION_TIME
+                self.vel.y = self.jumps_full_strength
+                self.jumps_selection_t = self.HOP_SELECTION_TIME
             # aerial jumps
             else:
-                self.vel.y = self.air_jump_strength
+                self.vel.y = self.jumps_air_strength
                 # only remove jumps when in aerial, to always allow grounded jumps
                 self.jumps -= 1
 
         # when released early convert the fullhop into a short hop
-        if self.hop_selection_t > 0:
-            self.hop_selection_t -= 1
-            if self.hop_selection_t <= 0 and inputs.unpressed(K_UP):
-                self.vel.y = self.short_hop_strength
+        if self.jumps_selection_t > 0:
+            self.jumps_selection_t -= 1
+            if self.jumps_selection_t <= 0 and inputs.unpressed(Movements.JUMP):
+                self.vel.y = self.jumps_short_strength
+
+    def handle_fast_fall(self):
+        if self.world.inputs.pressed(Movements.FALL) \
+                and not self.grounded \
+                and abs(self.vel.y) < self.fast_fall_y_vel_threshold:
+            self.gravity_multiplier = self.fast_fall_gravity_multiplier
+        # stop fast falling when the ground is reached
+        if self.grounded:
+            self.gravity_multiplier = 1
 
     def handle_physics(self):
         # gravity
-        self.apply_force(self.gravity_F)
+        self.apply_force(self.gravity_F * self.gravity_multiplier)
         self.acc.x += self.vel.x * self.fric
         self.vel += self.acc
         self.pos += self.vel + 0.5 * self.acc

@@ -21,7 +21,7 @@ class Platform(pygame.sprite.Sprite):
         if player.vel.y > 0:
             player.pos.y = self.rect.top + 1
             player.vel.y = 0
-            player.jumps = player.max_air_jumps
+            player.jumps = player.jumps_air_max
             return True
 
         if player.vel.y < 0:
